@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 import uuid
 
 from caspar.config import settings, get_logger
-from caspar.agent import create_agent_with_persistence, create_initial_state
+from caspar.agent import create_checkpointer_context, create_agent, create_initial_state
 from caspar.knowledge import get_retriever
 
 logger = get_logger(__name__)
@@ -25,25 +25,38 @@ agent = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Initialize resources on startup, cleanup on shutdown."""
+    """
+    Initialize resources on startup, cleanup on shutdown.
+    
+    The checkpointer context manager MUST wrap the yield to keep
+    the database connection open during the server's lifetime.
+    """
     global agent
     
     logger.info("starting_caspar_api", version="1.0.0")
     
-    # Initialize the agent with database persistence
-    # If DATABASE_URL is set, conversations will survive restarts
-    agent = await create_agent_with_persistence()
-    logger.info("agent_initialized")
-    
-    # Initialize knowledge base (validates it's ready)
+    # Initialize knowledge base first (validates it's ready)
     retriever = get_retriever()
     logger.info("knowledge_base_ready")
     
-    yield
+    # Create checkpointer context - connection stays open until shutdown
+    # If DATABASE_URL is set, conversations will persist across restarts
+    async with create_checkpointer_context() as checkpointer:
+        # Create the agent with the checkpointer
+        agent = await create_agent(checkpointer=checkpointer)
+        logger.info(
+            "agent_initialized",
+            persistence_enabled=checkpointer is not None
+        )
+        
+        # Server runs while we're inside this 'async with' block
+        yield
+        
+        # Cleanup on shutdown
+        logger.info("shutting_down_caspar_api")
+        conversations.clear()
     
-    # Cleanup
-    logger.info("shutting_down_caspar_api")
-    conversations.clear()
+    # Checkpointer connection closes automatically here
 
 
 app = FastAPI(
