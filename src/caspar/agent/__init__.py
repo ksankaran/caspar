@@ -4,7 +4,7 @@
 
 from .state import AgentState, create_initial_state, ConversationMetadata
 from .graph import build_graph, create_agent, get_graph_diagram
-from .persistence import create_checkpointer, create_agent_with_persistence
+from .persistence import create_checkpointer_context
 from .nodes import (
     classify_intent,
     handle_faq,
@@ -27,8 +27,7 @@ __all__ = [
     "create_agent",
     "get_graph_diagram",
     #Persistence
-    "create_checkpointer",
-    "create_agent_with_persistence",
+    "create_checkpointer_context",
     # Nodes
     "classify_intent",
     "handle_faq",
