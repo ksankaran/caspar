@@ -37,13 +37,12 @@ async def create_checkpointer() -> AsyncPostgresSaver | None:
     
     try:
         # Create the checkpointer
-        checkpointer = AsyncPostgresSaver.from_conn_string(database_url)
-        
-        # Set up the required tables (safe to call multiple times)
-        await checkpointer.setup()
-        
-        logger.info("checkpointer_initialized", database="postgresql")
-        return checkpointer
+        async with AsyncPostgresSaver.from_conn_string(database_url) as checkpointer:
+          # Set up the required tables (safe to call multiple times)
+          await checkpointer.setup()
+          
+          logger.info("checkpointer_initialized", database="postgresql")
+          return checkpointer
         
     except Exception as e:
         logger.error(
